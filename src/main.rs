@@ -25,6 +25,7 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     use serial::*;
     map.insert("xon/xoff", SerialOption::FlowControl(FlowControl::FlowSoftware));
     map.insert("rts/cts", SerialOption::FlowControl(FlowControl::FlowHardware));
+    // There has to be a better way to do baud rates... macros?
     map.insert("110", SerialOption::BaudRate(BaudRate::Baud110));
     map.insert("300", SerialOption::BaudRate(BaudRate::Baud300));
     map.insert("600", SerialOption::BaudRate(BaudRate::Baud600));
@@ -36,6 +37,17 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     map.insert("38400", SerialOption::BaudRate(BaudRate::Baud38400));
     map.insert("57600", SerialOption::BaudRate(BaudRate::Baud57600));
     map.insert("115200", SerialOption::BaudRate(BaudRate::Baud115200));
+    map.insert("B110", SerialOption::BaudRate(BaudRate::Baud110));
+    map.insert("B300", SerialOption::BaudRate(BaudRate::Baud300));
+    map.insert("B600", SerialOption::BaudRate(BaudRate::Baud600));
+    map.insert("B1200", SerialOption::BaudRate(BaudRate::Baud1200));
+    map.insert("B2400", SerialOption::BaudRate(BaudRate::Baud2400));
+    map.insert("B4800", SerialOption::BaudRate(BaudRate::Baud4800));
+    map.insert("B9600", SerialOption::BaudRate(BaudRate::Baud9600));
+    map.insert("B19200", SerialOption::BaudRate(BaudRate::Baud19200));
+    map.insert("B38400", SerialOption::BaudRate(BaudRate::Baud38400));
+    map.insert("B57600", SerialOption::BaudRate(BaudRate::Baud57600));
+    map.insert("B115200", SerialOption::BaudRate(BaudRate::Baud115200));
     map.insert("5", SerialOption::DataBits(CharSize::Bits5));
     map.insert("6", SerialOption::DataBits(CharSize::Bits6));
     map.insert("7", SerialOption::DataBits(CharSize::Bits7));
@@ -53,6 +65,10 @@ fn maybe_set_option(spec: &json::JsonValue, subkey: &str, mut settings: serial::
     let option: Option<SerialOption>;
     option = match &serial_config[subkey] {
         json::JsonValue::String(string) => {
+            key_to_serial_config(&string)
+        },
+        // TODO: use | here to make sure strings and shorts do the same thing
+        json::JsonValue::Short(string) => {
             key_to_serial_config(&string)
         },
         json::JsonValue::Number(number) => {
@@ -108,6 +124,7 @@ fn main() -> std::io::Result<()> {
     let mut contents = String::new();
     config_schema.read_to_string(&mut contents)?;
     let schema = json::parse(&contents).expect("unable to parse json");
+    println!("{:?}", schema);
 
     let mut settings = serial::PortSettings {
         baud_rate: serial::BaudRate::Baud9600,
@@ -122,6 +139,7 @@ fn main() -> std::io::Result<()> {
     for key in &["parity", "flow-control"] {
         settings = set_option(&schema, key, settings);
     }
+    println!("{:?}", settings);
     //let mut port : SerialOptions;
 
 
