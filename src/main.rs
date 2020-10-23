@@ -48,7 +48,7 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     map.remove(key)
 }
 
-fn maybe_set_option(spec: json::JsonValue, subkey: &str) {//, mut options: SerialOptions) {
+fn maybe_set_option(spec: json::JsonValue, subkey: &str, mut settings: serial::PortSettings) -> Option<serial::PortSettings> {//, mut options: SerialOptions) {
     let serial_config = &spec["serial-config"];//.expect("Invalid serial config spec, missing the 'serial-config' key");
     let option: Option<SerialOption>;
     option = match &serial_config[subkey] {
@@ -61,6 +61,18 @@ fn maybe_set_option(spec: json::JsonValue, subkey: &str) {//, mut options: Seria
         _ => {
             None
         }
+    };
+    match option {
+        Some(thing) => {
+            match thing {
+                SerialOption::FlowControl(flow) => {
+                    settings.set_flow_control(flow);
+                    Some(settings)
+                },
+                _ => None
+            }
+        },
+        None => None
     }
 }
 
