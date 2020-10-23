@@ -14,7 +14,7 @@ struct SerialOptions {
 //impl dd
 enum SerialOption {
     BaudRate(serial::BaudRate),
-    CharSize(serial::CharSize),
+    DataBits(serial::CharSize),
     Parity(serial::Parity),
     StopBits(serial::StopBits),
     FlowControl(serial::FlowControl)
@@ -36,10 +36,10 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     map.insert("38400", SerialOption::BaudRate(BaudRate::Baud38400));
     map.insert("57600", SerialOption::BaudRate(BaudRate::Baud57600));
     map.insert("115200", SerialOption::BaudRate(BaudRate::Baud115200));
-    map.insert("5", SerialOption::CharSize(CharSize::Bits5));
-    map.insert("6", SerialOption::CharSize(CharSize::Bits6));
-    map.insert("7", SerialOption::CharSize(CharSize::Bits7));
-    map.insert("8", SerialOption::CharSize(CharSize::Bits8));
+    map.insert("5", SerialOption::DataBits(CharSize::Bits5));
+    map.insert("6", SerialOption::DataBits(CharSize::Bits6));
+    map.insert("7", SerialOption::DataBits(CharSize::Bits7));
+    map.insert("8", SerialOption::DataBits(CharSize::Bits8));
     map.insert("odd", SerialOption::Parity(Parity::ParityOdd));
     map.insert("even", SerialOption::Parity(Parity::ParityEven));
     map.insert("1", SerialOption::StopBits(StopBits::Stop1));
@@ -48,7 +48,7 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     map.remove(key)
 }
 
-fn maybe_set_option(spec: json::JsonValue, subkey: &str, mut settings: serial::PortSettings) -> Option<serial::PortSettings> {//, mut options: SerialOptions) {
+fn maybe_set_option(spec: &json::JsonValue, subkey: &str, mut settings: serial::PortSettings) -> Option<serial::PortSettings> {//, mut options: SerialOptions) {
     let serial_config = &spec["serial-config"];//.expect("Invalid serial config spec, missing the 'serial-config' key");
     let option: Option<SerialOption>;
     option = match &serial_config[subkey] {
@@ -67,12 +67,39 @@ fn maybe_set_option(spec: json::JsonValue, subkey: &str, mut settings: serial::P
             match thing {
                 SerialOption::FlowControl(flow) => {
                     settings.set_flow_control(flow);
+                    Some(settings) // TODO: reduce this boilerplate?
+                },
+                SerialOption::BaudRate(speed) => {
+                    settings.set_baud_rate(speed).expect("Problem setting baud rate");
                     Some(settings)
                 },
+                SerialOption::StopBits(stop) => {
+                    settings.set_stop_bits(stop);
+                    Some(settings)
+                },
+                SerialOption::DataBits(data) => {
+                    settings.set_char_size(data);
+                    Some(settings)
+                },
+                SerialOption::Parity(parity) => {
+                    settings.set_parity(parity);
+                    Some(settings)
+                }
                 _ => None
             }
         },
         None => None
+    }
+}
+
+fn set_option(spec: &json::JsonValue, subkey: &str, settings: serial::PortSettings) -> serial::PortSettings {
+    match maybe_set_option(spec, subkey, settings) {
+        Some(new) => { 
+            new
+        },
+        None => {
+            settings
+        }
     }
 }
 
@@ -82,6 +109,19 @@ fn main() -> std::io::Result<()> {
     config_schema.read_to_string(&mut contents)?;
     let schema = json::parse(&contents).expect("unable to parse json");
 
+    let mut settings = serial::PortSettings {
+        baud_rate: serial::BaudRate::Baud9600,
+        char_size: serial::CharSize::Bits8,
+        parity: serial::Parity::ParityNone,
+        stop_bits: serial::StopBits::Stop1,
+        flow_control: serial::FlowControl::FlowNone
+    };
+    settings = set_option(&schema, "baud", settings);
+    settings = set_option(&schema, "data-bits", settings);
+    //settings = set_option(schema, "stop-bits", 
+    for key in &["parity", "flow-control"] {
+        settings = set_option(&schema, key, settings);
+    }
     //let mut port : SerialOptions;
 
 
