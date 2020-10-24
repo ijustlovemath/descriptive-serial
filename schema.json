@@ -3,88 +3,88 @@
     "_comment" : [
         "Do we want to automagically generate the structs for sending  and receiving data?"
     ],
-	"serial-config" : {
+    "serial-config" : {
         "_comment" : {
             "baud" : "# standard bauds prefixed with 'B', nonstandard bauds supported in the future",
             "flow-control" : "could be 'rts/cts', 'none'"
         },
-		"baud" : "B115200", 
-		"data-bits" : 8,
-		"stop-bits" : 1,
-		"parity" : "odd",
-		"flow-control" : "xon/xoff"
-	},
-	"states" : [
-		{
-			"_comment" : {
+        "baud" : "B90", 
+        "data-bits" : 8,
+        "stop-bits" : 1,
+        "parity" : "odd",
+        "flow-control" : "xon/xoff"
+    },
+    "states" : [
+        {
+            "_comment" : {
                 "state" : ["States of serial command grammar are described by this key"
                     , "Do we really need the state key?"
                 ]
             },
-			"state" : {
+            "state" : {
                 "_comment" : {
                     "format" : "Could be 'header' and 'payload'"
                 },
-			    "template" : {
-					"name" : "command packet",
+                "template" : {
+                    "name" : "command packet",
                     "_comment" : {
                         "name" : "future expansion, reduce repeated declarations"
                     }
-				},
-				"type" : "send",
-				"name" : "send_command",
-				"format" : "header-then-payload", 
-				"contents" : {
-					"header" : {
-						"verification" : {
+                },
+                "type" : "send",
+                "name" : "send_command",
+                "format" : "header-then-payload", 
+                "contents" : {
+                    "header" : {
+                        "verification" : {
                             "_comment" : {
                                 "method" : "Could be 'from-user', 'crc8', 'crc16', 'crc32', 'crc-ccitt', 'md5', 'fletcher-16', 'fletcher-32'"
                             },
-							"method" : "none",
+                            "method" : "none",
                             "config" : {
-								"_comment" : "method specific configuration eg polynomial, parity, initial value goes here"
-							}
-						},
-						"contents" : [
-							{
+                                "_comment" : "method specific configuration eg polynomial, parity, initial value goes here"
+                            }
+                        },
+                        "contents" : [
+                            {
                                 "_comment" : {
                                     "order" : "Could be 'host', 'little-endian', 'network'",
                                     "type" : "Could be 'u8', 'u32', 'u64', 'u128', 'payload', 'payload-length', 'verification'"
                                 },
-								"field_name" : "canary",
-								"type" : "u16", 
-								"value" : "0xdeadbeef",
-								"order" : "big-endian" 
-							},
-							{
+                                "field_name" : "canary",
+                                "type" : "u16", 
+                                "value" : "0xdeadbeef",
+                                "order" : "big-endian" 
+                            },
+                            {
                                 "_comment" : {
                                     "value" : "from-user: When you want to populate this value from the program"
                                 },
-								"field_name" : "command type",
-								"type" : "u16",
-								"value" : "from-user"
-							},
-							{
+                                "field_name" : "command type",
+                                "type" : "u16",
+                                "value" : "from-user"
+                            },
+                            {
                                 "_comment" : {
                                     "type" : "value is automagically determined in 'payload-length' field types"
                                 },
-								"field_name" : "payload size",
-								"type" : "payload-length",
-								"order" : "big-endian"
-							}
-						]
-					
-					},
-					"payload" : {
-						"verification" : {
-							"method" : "from-user",
-							"config" : {
-								"method-name" : "my_custom_checksum"
-							}
-						}
-					}
-				}
-			}
-		}
-	]
+                                "field_name" : "payload size",
+                                "type" : "payload-length",
+                                "order" : "big-endian"
+                            }
+                        ]
+                    
+                    },
+                    "payload" : {
+                        "verification" : {
+                            "method" : "from-user",
+                            "config" : {
+                                "method-name" : "my_custom_checksum"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
 }

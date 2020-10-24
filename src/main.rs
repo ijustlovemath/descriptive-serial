@@ -12,6 +12,7 @@ struct SerialOptions {
 }
 
 //impl dd
+#[derive(Debug)]
 enum SerialOption {
     BaudRate(serial::BaudRate),
     DataBits(serial::CharSize),
@@ -63,7 +64,8 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
 fn maybe_set_option(spec: &json::JsonValue, subkey: &str, mut settings: serial::PortSettings) -> Option<serial::PortSettings> {//, mut options: SerialOptions) {
     let serial_config = &spec["serial-config"];//.expect("Invalid serial config spec, missing the 'serial-config' key");
     let option: Option<SerialOption>;
-    option = match &serial_config[subkey] {
+    let key = &serial_config[subkey];
+    option = match key {
         json::JsonValue::String(string) => {
             key_to_serial_config(&string)
         },
@@ -75,6 +77,7 @@ fn maybe_set_option(spec: &json::JsonValue, subkey: &str, mut settings: serial::
             key_to_serial_config(&number.to_string())
         },
         _ => {
+            println!("[WARNING] Unexpected type found for {:?}", key);
             None
         }
     };
@@ -100,11 +103,14 @@ fn maybe_set_option(spec: &json::JsonValue, subkey: &str, mut settings: serial::
                 SerialOption::Parity(parity) => {
                     settings.set_parity(parity);
                     Some(settings)
-                }
+                },
                 _ => None
             }
         },
-        None => None
+        None => {
+            println!("[WARNING] Unrecognized option {:?} for setting {}, using default...", key, subkey);
+            None
+        }
     }
 }
 
@@ -119,12 +125,47 @@ fn set_option(spec: &json::JsonValue, subkey: &str, settings: serial::PortSettin
     }
 }
 
+struct SerialState<'a> {
+    next: Option<&'a SerialState<'a>>,
+    name: String,
+    kind: String, // TODO enum
+    template: String, // TODO SerialStateTemplate struct
+    format: String, // TODO enum
+    contents: Option<String>, // TODO SerialStateContents struct
+}
+
+fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
+    // states have the following structure:
+    // {
+    //  "template" : {} // optional, not required
+    //  "type" : "send" or "receive"
+    //  "name" : user defined, should be equal to name parameter
+    //  "format" : "header", "payload", or "header-then-payload"
+    //  "contents" : specific to what "format" is
+    // }
+    assert_eq!(name, state_spec["name"]);
+    // we're gonna ignore template states for now...
+    //
+    SerialState {
+        next: None,
+        name: name.to_string(),
+        kind: state_spec["type"].to_string(),
+        template: "unsupported".to_string(),
+        format: state_spec["format"].to_string(),
+        contents: None,
+    }
+}
+
+fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, lookup: &'a mut HashMap<&str, SerialState>) -> &'a SerialState<'a> {
+    lookup.entry(name).or_insert(state_constructor(name, state_spec));
+    &lookup[name]
+}
+
 fn main() -> std::io::Result<()> {
     let mut config_schema = File::open("schema.json")?;
     let mut contents = String::new();
     config_schema.read_to_string(&mut contents)?;
     let schema = json::parse(&contents).expect("unable to parse json");
-    println!("{:?}", schema);
 
     let mut settings = serial::PortSettings {
         baud_rate: serial::BaudRate::Baud9600,
@@ -133,10 +174,7 @@ fn main() -> std::io::Result<()> {
         stop_bits: serial::StopBits::Stop1,
         flow_control: serial::FlowControl::FlowNone
     };
-    settings = set_option(&schema, "baud", settings);
-    settings = set_option(&schema, "data-bits", settings);
-    //settings = set_option(schema, "stop-bits", 
-    for key in &["parity", "flow-control"] {
+    for key in &["parity", "flow-control", "baud", "data-bits", "stop-bits"] {
         settings = set_option(&schema, key, settings);
     }
     println!("{:?}", settings);
