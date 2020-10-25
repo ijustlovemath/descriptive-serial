@@ -189,17 +189,25 @@ fn fake_serialstate<'a> () -> SerialState<'a> {
 // TODO: the function signature for this feels wrong... state_spec contains name
 // cause lookups can be done with a [], so what is this ~actually doing~? 
 // needs a better name
-fn state_lookup_build<'a>(name: &'a str, state_spec: json::JsonValue, mut lookup: HashMap<&'a str, SerialState<'a>>) 
+fn state_lookup_build<'a>(state_spec: json::JsonValue, mut lookup: HashMap<String, SerialState<'a>>) 
     //-> HashMap<&'a str, SerialState<'a>> {
-    -> (HashMap<&'a str, SerialState<'a>>, SerialState<'a>) {
+    -> (HashMap<String, SerialState<'a>>, SerialState<'a>) {
+
+    let name = match &state_spec["name"] {
+        json::JsonValue::String(string) => *string,
+        json::JsonValue::Short(short) => short.to_string(),
+        _ => {
+            panic!("unexpected type at 'name' key -> {:?}", state_spec);
+        }
+    }.to_string();
 
 
-    if lookup.contains_key(name) {
+    if lookup.contains_key(&name) {
         panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
     }
-    lookup.entry(name).or_insert(state_constructor(name, state_spec));
+    lookup.entry(name).or_insert(state_constructor(&name.clone(), state_spec));
     // we have to do this because rust is stupid about rvalues (ok i know it's not but still)
-    let state = lookup[name].clone();
+    let state = lookup[&name].clone();
     (lookup, state)
 }
 
@@ -207,23 +215,11 @@ fn get_type_string<T>(_: &T) -> String {
     format!("{:?}", std::any::type_name::<T>())
 }
 
-fn build_state_lookup<'a>(states_spec: json::Array) -> HashMap<&'a str, SerialState<'a>> {
+fn build_state_lookup<'a>(states_spec: json::Array) -> HashMap<String, SerialState<'a>> {
     let mut lookup = HashMap::new();
     for state in states_spec {
-        let name = match &state["name"] {
-            json::JsonValue::String(string) => {
-                string.clone()
-            },
-            json::JsonValue::Short(string) => {
-                string
-            }.to_string(),
-            _ => {
-                panic!("Unexpected data type for 'name' key: {:?}, should be 'String' or 'Short'", get_type_string(&state["name"])); 
-            }
-
-        };
         // code smell here; why drop _? why get name when it's avail in state?
-        let res = state_lookup_build(&name, state, lookup.clone());
+        let res = state_lookup_build(state, lookup.clone());
         lookup = res.0;
     }
     lookup
@@ -253,7 +249,7 @@ fn test_state_lookup_build() {
     let map = HashMap::new();
     let name = "foo";
     let spec = fake_jsonobj();
-    let (map, state) = state_lookup_build(&name, spec, map);
+    let (map, state) = state_lookup_build(spec, map);
     assert_eq!(map[name].name, "foo".to_string());
     let expected = fake_serialstate();
     assert_eq!(state, expected);
