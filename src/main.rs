@@ -244,13 +244,17 @@ fn test_build_state_lookup() -> std::io::Result<()> {
     Ok(())
 }
 
-fn link_states<'a>(&mut lookup: HashMap<String, SerialState<'a>>) {
+fn link_states<'a>(lookup: HashMap<String, SerialState<'a>>) {
     //for state in 
     //alarm bells are already ringing about this... the borrow checker will not like medoing
     //dynamic links between states. shit.
     //we can try doing this: https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
-
-
+    use indextree::Arena;
+    let arena = &mut Arena::new();
+    // TODO: just put nodeId's in map, not the actual states
+    for (_name, state) in lookup.iter() {
+        let _id = arena.new_node(state.clone());
+    }
 }
 
 fn test_state_lookup_build() {

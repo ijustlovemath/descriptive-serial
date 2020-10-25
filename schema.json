@@ -26,6 +26,7 @@
           "name": "future expansion, reduce repeated declarations"
         }
       },
+      "next": "recv_response",
       "type": "send",
       "name": "send_command",
       "format": "header-then-payload",
@@ -78,6 +79,13 @@
           }
         }
       }
+    },
+    {
+      "name": "recv_response",
+      "next": null,
+      "type": "receive",
+      "format": "header-then-payload",
+      "contents": null
     }
   ]
 }
