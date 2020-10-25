@@ -244,7 +244,14 @@ fn test_build_state_lookup() -> std::io::Result<()> {
     Ok(())
 }
 
-//fn link_states<'a>(mut lookup: HashMap<
+fn link_states<'a>(&mut lookup: HashMap<String, SerialState<'a>>) {
+    //for state in 
+    //alarm bells are already ringing about this... the borrow checker will not like medoing
+    //dynamic links between states. shit.
+    //we can try doing this: https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
+
+
+}
 
 fn test_state_lookup_build() {
     let map = HashMap::new();
