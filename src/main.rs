@@ -1,4 +1,8 @@
 use json;
+use indextree::{
+    Arena,
+    NodeId
+};
 //use json::JsonValue;
 use std::fs::File;
 use std::io::Result;
@@ -127,8 +131,8 @@ fn set_option(spec: &json::JsonValue, subkey: &str, settings: serial::PortSettin
 }
 
 #[derive(Debug, PartialEq, Clone)]
-struct SerialState<'a> {
-    next: Option<&'a SerialState<'a>>,
+struct SerialState {
+    next: Option<NodeId>,
     name: String,
     kind: String, // TODO enum
     template: String, // TODO SerialStateTemplate struct
@@ -136,7 +140,7 @@ struct SerialState<'a> {
     contents: Option<String>, // TODO SerialStateContents struct
 }
 
-fn state_constructor<'a>(state_spec: json::JsonValue) -> SerialState<'a> {
+fn state_constructor(state_spec: json::JsonValue) -> SerialState {
     // states have the following structure:
     // {
     //  "template" : {} // optional, not required
@@ -174,7 +178,7 @@ fn fake_jsonobj() -> json::JsonValue {
             }"#).unwrap()
 }
 
-fn fake_serialstate<'a> () -> SerialState<'a> {
+fn fake_serialstate () -> SerialState {
     SerialState {
          next: None,
          name: "foo".to_string(),
@@ -185,20 +189,24 @@ fn fake_serialstate<'a> () -> SerialState<'a> {
     }
 }
 
-// TODO: the function signature for this feels wrong... state_spec contains name
-// cause lookups can be done with a [], so what is this ~actually doing~? 
-// needs a better name
-fn state_lookup_build<'a>(state_spec: json::JsonValue, mut lookup: HashMap<String, SerialState<'a>>) 
-    //-> HashMap<&'a str, SerialState<'a>> {
-    -> (HashMap<String, SerialState<'a>>, SerialState<'a>) {
-
-    let name = match &state_spec["name"] {
+fn state_name(state_spec: &json::JsonValue) -> String {
+    match &state_spec["name"] {
         json::JsonValue::String(string) => String::from(string),
         json::JsonValue::Short(short) => short.to_string(),
         _ => {
             panic!("unexpected type at 'name' key -> {:?}", state_spec);
         }
-    }.to_string();
+    }
+}
+
+// TODO: the function signature for this feels wrong... state_spec contains name
+// cause lookups can be done with a [], so what is this ~actually doing~? 
+// needs a better name
+fn state_lookup_build(state_spec: json::JsonValue, mut lookup: HashMap<String, SerialState>) 
+    //-> HashMap<&'a str, SerialState<'a>> {
+    -> (HashMap<String, SerialState>, SerialState) {
+
+    let name = state_name(&state_spec);
 
 
     if lookup.contains_key(&name) {
@@ -216,7 +224,7 @@ fn get_type_string<T>(_: &T) -> String {
     format!("{:?}", std::any::type_name::<T>())
 }
 
-fn build_state_lookup<'a>(states_spec: json::Array) -> HashMap<String, SerialState<'a>> {
+fn build_state_lookup(states_spec: json::Array) -> HashMap<String, SerialState> {
     let mut lookup = HashMap::new();
     for state in states_spec {
         // code smell here; why drop _? why get name when it's avail in state?
@@ -244,16 +252,20 @@ fn test_build_state_lookup() -> std::io::Result<()> {
     Ok(())
 }
 
-fn link_states<'a>(lookup: HashMap<String, SerialState<'a>>) {
+fn link_states(states_spec: json::Array, lookup: HashMap<String, SerialState>) {
     //for state in 
     //alarm bells are already ringing about this... the borrow checker will not like medoing
     //dynamic links between states. shit.
     //we can try doing this: https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
-    use indextree::Arena;
     let arena = &mut Arena::new();
     // TODO: just put nodeId's in map, not the actual states
-    for (_name, state) in lookup.iter() {
-        let _id = arena.new_node(state.clone());
+    // all states are present in the lookup, since that's filled before this
+    for state_spec in states_spec {
+        let name = state_name(&state_spec);
+        let state = lookup[&name].clone();
+        let id = arena.new_node(state);
+        
+
     }
 }
 
