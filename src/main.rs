@@ -1,14 +1,11 @@
 use json;
-use indextree::{
-    Arena,
-    NodeId
-};
 //use json::JsonValue;
 use std::fs::File;
 use std::io::Result;
 use std::io::Read;
 use std::collections::HashMap;
 use std::option::Option;
+use std::vec::Vec;
 
 use serial::prelude::*;
 
@@ -132,7 +129,7 @@ fn set_option(spec: &json::JsonValue, subkey: &str, settings: serial::PortSettin
 
 #[derive(Debug, PartialEq, Clone)]
 struct SerialState {
-    next: Option<NodeId>,
+    next: Option<usize>,
     name: String,
     kind: String, // TODO enum
     template: String, // TODO SerialStateTemplate struct
@@ -212,7 +209,7 @@ fn state_name(state_spec: &json::JsonValue) -> String {
     state_string(state_spec, "name")
 }
 
-fn check_create_state(state_spec: &json::JsonValue, lookup: &HashMap<String, NodeId>) -> SerialState {
+fn check_create_state(state_spec: &json::JsonValue, lookup: &HashMap<String, usize>) -> SerialState {
     let name = state_name(&state_spec);
     
     if lookup.contains_key(&name) {
@@ -293,18 +290,21 @@ fn test_link_states() -> std::io::Result<()> {
 
 }
 
-fn link_states(states_spec: json::Array) {
+fn link_states(states_spec: json::Array) -> (Vec<SerialState>, HashMap<String, usize>) {
     //for state in 
     //alarm bells are already ringing about this... the borrow checker will not like medoing
     //dynamic links between states. shit.
     //we can try doing this: https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
-    let arena = &mut Arena::new();
+    let arena = &mut Vec::new();
     let id_lookup = &mut HashMap::new();
     // TODO: just put nodeId's in map, not the actual states
     for state_spec in &states_spec {
         let name = state_name(&state_spec);
         let state = check_create_state(state_spec, id_lookup);
-        let id = arena.new_node(state);
+
+        // simple arena is a vector
+        let id = arena.len(); // This is the index at which the state will be inserted
+        arena.push(state);
         id_lookup.insert(name, id);
     }
     // once every state has been populated, we can define next states
@@ -312,6 +312,9 @@ fn link_states(states_spec: json::Array) {
     for state_spec in &states_spec {
         let name = state_name(&state_spec);
         let id = id_lookup[&name];
+
+        // The next state may be 'null', in which case we need to not do anything (since that's the
+        // default)
         let next_name: String;
         match state_string_maybe(&state_spec, "next") {
             Some(string) => {
@@ -325,11 +328,10 @@ fn link_states(states_spec: json::Array) {
         
         let error_msg = format!("A state named {} with ID {} should exist, but doesn't", name, id);
         let state = arena.get_mut(id).expect(&error_msg);
-        println!("{}", get_type_string(state));
-//        state.next = next_id;
-     
-        println!("state filled: {:?}", state)
+        state.next = Some(next_id);
     }
+
+    (arena.to_vec(), id_lookup.clone())
 }
 
 fn test_state_lookup_build() {
