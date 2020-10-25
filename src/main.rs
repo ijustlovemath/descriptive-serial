@@ -140,7 +140,7 @@ struct SerialState {
     contents: Option<String>, // TODO SerialStateContents struct
 }
 
-fn state_constructor(state_spec: json::JsonValue) -> SerialState {
+fn state_constructor(state_spec: &json::JsonValue) -> SerialState {
     // states have the following structure:
     // {
     //  "template" : {} // optional, not required
@@ -163,7 +163,7 @@ fn state_constructor(state_spec: json::JsonValue) -> SerialState {
 
 fn test_state_constructor() {
     let jsono = fake_jsonobj();
-    let actual = state_constructor(jsono);
+    let actual = state_constructor(&jsono);
     let expected = fake_serialstate();
     assert_eq!(actual, expected);
 
@@ -189,14 +189,37 @@ fn fake_serialstate () -> SerialState {
     }
 }
 
-fn state_name(state_spec: &json::JsonValue) -> String {
-    match &state_spec["name"] {
-        json::JsonValue::String(string) => String::from(string),
-        json::JsonValue::Short(short) => short.to_string(),
-        _ => {
-            panic!("unexpected type at 'name' key -> {:?}", state_spec);
+fn state_string(state_spec: &json::JsonValue, key: &str) -> String {
+    match state_string_maybe(state_spec, key) {
+        Some(value) => value,
+        None => {
+            panic!("unexpected type at '{}' key -> {:?}", key, state_spec);
         }
     }
+}
+
+fn state_string_maybe(state_spec: &json::JsonValue, key: &str) -> Option<String> {
+    match &state_spec[key] {
+        json::JsonValue::String(string) => Some(String::from(string)),
+        json::JsonValue::Short(short) => Some(short.to_string()),
+        _ => {
+            None
+        }
+    }
+}
+
+fn state_name(state_spec: &json::JsonValue) -> String {
+    state_string(state_spec, "name")
+}
+
+fn check_create_state(state_spec: &json::JsonValue, lookup: &HashMap<String, NodeId>) -> SerialState {
+    let name = state_name(&state_spec);
+    
+    if lookup.contains_key(&name) {
+        panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
+    }
+
+    state_constructor(&state_spec)
 }
 
 // TODO: the function signature for this feels wrong... state_spec contains name
@@ -213,7 +236,7 @@ fn state_lookup_build(state_spec: json::JsonValue, mut lookup: HashMap<String, S
         panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
     }
 
-    lookup.insert(name.clone(), state_constructor(state_spec));
+    lookup.insert(name.clone(), state_constructor(&state_spec));
     //lookup.entry(name).or_insert(state_constructor(&name.clone(), state_spec));
     // we have to do this because rust is stupid about rvalues (ok i know it's not but still)
     let state = lookup[&name].clone();
@@ -252,20 +275,60 @@ fn test_build_state_lookup() -> std::io::Result<()> {
     Ok(())
 }
 
-fn link_states(states_spec: json::Array, lookup: HashMap<String, SerialState>) {
+fn test_link_states() -> std::io::Result<()> {
+    let mut config_schema = File::open("schema.json")?;
+    let mut contents = String::new();
+    config_schema.read_to_string(&mut contents)?;
+    let schema = json::parse(&contents).expect("unable to parse json");
+
+    match &schema["states"] {
+        json::JsonValue::Array(states) => {
+            link_states(states.to_vec())
+        },
+        _ => {
+            panic!("unexpected type at states key");
+        }
+    };
+    Ok(())
+
+}
+
+fn link_states(states_spec: json::Array) {
     //for state in 
     //alarm bells are already ringing about this... the borrow checker will not like medoing
     //dynamic links between states. shit.
     //we can try doing this: https://rust-leipzig.github.io/architecture/2016/12/20/idiomatic-trees-in-rust/
     let arena = &mut Arena::new();
+    let id_lookup = &mut HashMap::new();
     // TODO: just put nodeId's in map, not the actual states
-    // all states are present in the lookup, since that's filled before this
-    for state_spec in states_spec {
+    for state_spec in &states_spec {
         let name = state_name(&state_spec);
-        let state = lookup[&name].clone();
+        let state = check_create_state(state_spec, id_lookup);
         let id = arena.new_node(state);
+        id_lookup.insert(name, id);
+    }
+    // once every state has been populated, we can define next states
+    // all states should have an ID at this point
+    for state_spec in &states_spec {
+        let name = state_name(&state_spec);
+        let id = id_lookup[&name];
+        let next_name: String;
+        match state_string_maybe(&state_spec, "next") {
+            Some(string) => {
+                next_name = string
+            },
+            None => {
+                continue; // we've reached a stop state, nothing to do here
+            }
+        }
+        let next_id = id_lookup[&next_name];
         
-
+        let error_msg = format!("A state named {} with ID {} should exist, but doesn't", name, id);
+        let state = arena.get_mut(id).expect(&error_msg);
+        println!("{}", get_type_string(state));
+//        state.next = next_id;
+     
+        println!("state filled: {:?}", state)
     }
 }
 
@@ -302,5 +365,6 @@ fn main() -> std::io::Result<()> {
     test_state_constructor();
     test_state_lookup_build();
     test_build_state_lookup();
+    test_link_states();
     Ok(())
 }
