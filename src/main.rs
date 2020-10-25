@@ -125,6 +125,7 @@ fn set_option(spec: &json::JsonValue, subkey: &str, settings: serial::PortSettin
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
 struct SerialState<'a> {
     next: Option<&'a SerialState<'a>>,
     name: String,
@@ -156,9 +157,52 @@ fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
     }
 }
 
-fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, lookup: &'a mut HashMap<&str, SerialState>) -> &'a SerialState<'a> {
+fn test_state_constructor() {
+    let jsono = test_jsonobj();
+    let actual = state_constructor("foo", jsono);
+    let expected = test_serialstate();
+    assert_eq!(actual, expected);
+
+}
+
+fn test_jsonobj() -> json::JsonValue {
+    json::parse(r#"
+            {
+                "name":"foo",
+                "type":"send",
+                "format":"hello"
+            }"#).unwrap()
+}
+
+fn test_serialstate<'a> () -> SerialState<'a> {
+    SerialState {
+         next: None,
+         name: "foo".to_string(),
+         kind: "send".to_string(),
+         template: "unsupported".to_string(),
+         format: "hello".to_string(),
+         contents: None
+    }
+}
+
+fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, lookup: &'a mut HashMap<&'a str, SerialState<'a>>) 
+   // -> &'a SerialState<'a> {
+    -> HashMap< {
+
     lookup.entry(name).or_insert(state_constructor(name, state_spec));
-    &lookup[name]
+    lookup
+    //&lookup[name]
+}
+
+fn test_state_lookup() {
+    let mut map = HashMap::new();
+    let name = "foo";
+    let spec = test_jsonobj();
+    {
+    let reff = state_lookup(name, spec, &mut map);
+    }
+    let test = map.get(name).unwrap();//.clone();
+    assert_eq!(test.name, "foo".to_string());
 }
 
 fn main() -> std::io::Result<()> {
@@ -181,5 +225,7 @@ fn main() -> std::io::Result<()> {
     //let mut port : SerialOptions;
 
 
+    test_state_constructor();
+    test_state_lookup();
     Ok(())
 }
