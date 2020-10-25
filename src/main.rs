@@ -1,5 +1,4 @@
 use json;
-//use json::JsonValue;
 use std::fs::File;
 use std::io::Result;
 use std::io::Read;
@@ -23,6 +22,12 @@ enum SerialOption {
     FlowControl(serial::FlowControl)
 }
 
+macro_rules! insert_baud {
+    ($rate:literal) => {
+        map.insert(stringify!($rate), SerialOption::BaudRate(BaudRate::concat_idents!(Baud, $rate)));
+    }
+}
+
 fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     let mut map = HashMap::new();
     use serial::*;
@@ -30,6 +35,7 @@ fn key_to_serial_config(key: &str) -> Option<SerialOption> {
     map.insert("rts/cts", SerialOption::FlowControl(FlowControl::FlowHardware));
     // There has to be a better way to do baud rates... macros?
     map.insert("110", SerialOption::BaudRate(BaudRate::Baud110));
+//    insert_baud!(110);
     map.insert("300", SerialOption::BaudRate(BaudRate::Baud300));
     map.insert("600", SerialOption::BaudRate(BaudRate::Baud600));
     map.insert("1200", SerialOption::BaudRate(BaudRate::Baud1200));
@@ -266,11 +272,10 @@ fn run_fsm(machine: Vec<SerialState>) {
         println!("current state: {:?}", current);
         if let Some(next_id) = current.next {
             current = &machine[next_id];
-            println!("moving to next state: {:?}", current);
             continue
         } else {
             println!("terminal state reached, breaking out...");
-            break;
+            break
         }
     }
 }
