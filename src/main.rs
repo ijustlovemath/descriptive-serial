@@ -1,4 +1,5 @@
 use json;
+//use json::JsonValue;
 use std::fs::File;
 use std::io::Result;
 use std::io::Read;
@@ -158,14 +159,14 @@ fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
 }
 
 fn test_state_constructor() {
-    let jsono = test_jsonobj();
+    let jsono = make_serialstate();
     let actual = state_constructor("foo", jsono);
     let expected = test_serialstate();
     assert_eq!(actual, expected);
 
 }
 
-fn test_jsonobj() -> json::JsonValue {
+fn make_serialstate() -> json::JsonValue {
     json::parse(r#"
             {
                 "name":"foo",
@@ -185,24 +186,29 @@ fn test_serialstate<'a> () -> SerialState<'a> {
     }
 }
 
-fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, lookup: &'a mut HashMap<&'a str, SerialState<'a>>) 
-   // -> &'a SerialState<'a> {
-    -> HashMap< {
+fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, mut lookup: HashMap<&'a str, SerialState<'a>>) 
+    //-> HashMap<&'a str, SerialState<'a>> {
+    -> (HashMap<&'a str, SerialState<'a>>, SerialState<'a>) {
 
+
+    if lookup.contains_key(name) {
+        panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
+    }
+    // silently ignore if they supply a duplicate state
     lookup.entry(name).or_insert(state_constructor(name, state_spec));
-    lookup
-    //&lookup[name]
+    // we have to do this because rust is stupid about rvalues (ok i know it's not but still)
+    let state = lookup[name].clone();
+    (lookup, state)
 }
 
 fn test_state_lookup() {
-    let mut map = HashMap::new();
+    let map = HashMap::new();
     let name = "foo";
-    let spec = test_jsonobj();
-    {
-    let reff = state_lookup(name, spec, &mut map);
-    }
-    let test = map.get(name).unwrap();//.clone();
-    assert_eq!(test.name, "foo".to_string());
+    let spec = make_serialstate();
+    let (map, state) = state_lookup(&name, spec, map);
+    assert_eq!(map[name].name, "foo".to_string());
+    let expected = test_serialstate();
+    assert_eq!(state, expected);
 }
 
 fn main() -> std::io::Result<()> {
