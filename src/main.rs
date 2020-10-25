@@ -159,14 +159,14 @@ fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
 }
 
 fn test_state_constructor() {
-    let jsono = make_serialstate();
+    let jsono = fake_jsonobj();
     let actual = state_constructor("foo", jsono);
-    let expected = test_serialstate();
+    let expected = fake_serialstate();
     assert_eq!(actual, expected);
 
 }
 
-fn make_serialstate() -> json::JsonValue {
+fn fake_jsonobj() -> json::JsonValue {
     json::parse(r#"
             {
                 "name":"foo",
@@ -175,7 +175,7 @@ fn make_serialstate() -> json::JsonValue {
             }"#).unwrap()
 }
 
-fn test_serialstate<'a> () -> SerialState<'a> {
+fn fake_serialstate<'a> () -> SerialState<'a> {
     SerialState {
          next: None,
          name: "foo".to_string(),
@@ -186,7 +186,10 @@ fn test_serialstate<'a> () -> SerialState<'a> {
     }
 }
 
-fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, mut lookup: HashMap<&'a str, SerialState<'a>>) 
+// TODO: the function signature for this feels wrong... state_spec contains name
+// cause lookups can be done with a [], so what is this ~actually doing~? 
+// needs a better name
+fn state_lookup_build<'a>(name: &'a str, state_spec: json::JsonValue, mut lookup: HashMap<&'a str, SerialState<'a>>) 
     //-> HashMap<&'a str, SerialState<'a>> {
     -> (HashMap<&'a str, SerialState<'a>>, SerialState<'a>) {
 
@@ -194,20 +197,65 @@ fn state_lookup<'a>(name: &'a str, state_spec: json::JsonValue, mut lookup: Hash
     if lookup.contains_key(name) {
         panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
     }
-    // silently ignore if they supply a duplicate state
     lookup.entry(name).or_insert(state_constructor(name, state_spec));
     // we have to do this because rust is stupid about rvalues (ok i know it's not but still)
     let state = lookup[name].clone();
     (lookup, state)
 }
 
-fn test_state_lookup() {
+fn get_type_string<T>(_: &T) -> String {
+    format!("{:?}", std::any::type_name::<T>())
+}
+
+fn build_state_lookup<'a>(states_spec: json::Array) -> HashMap<&'a str, SerialState<'a>> {
+    let mut lookup = HashMap::new();
+    for state in states_spec {
+        let name = match &state["name"] {
+            json::JsonValue::String(string) => {
+                string.clone()
+            },
+            json::JsonValue::Short(string) => {
+                string
+            }.to_string(),
+            _ => {
+                panic!("Unexpected data type for 'name' key: {:?}, should be 'String' or 'Short'", get_type_string(&state["name"])); 
+            }
+
+        };
+        // code smell here; why drop _? why get name when it's avail in state?
+        let res = state_lookup_build(&name, state, lookup.clone());
+        lookup = res.0;
+    }
+    lookup
+}
+
+fn test_build_state_lookup() -> std::io::Result<()> {
+    let mut config_schema = File::open("schema.json")?;
+    let mut contents = String::new();
+    config_schema.read_to_string(&mut contents)?;
+    let schema = json::parse(&contents).expect("unable to parse json");
+
+    let lookup = match &schema["states"] {
+        json::JsonValue::Array(states) => {
+            build_state_lookup(states.to_vec())
+        },
+        _ => {
+            panic!("unexpected type at states key");
+        }
+    };
+    println!("states: {:?}", lookup);
+    Ok(())
+}
+
+//fn link_states<'a>(mut lookup: HashMap<
+
+fn test_state_lookup_build() {
     let map = HashMap::new();
     let name = "foo";
-    let spec = make_serialstate();
-    let (map, state) = state_lookup(&name, spec, map);
+    let spec = fake_jsonobj();
+    let (map, state) = state_lookup_build(&name, spec, map);
     assert_eq!(map[name].name, "foo".to_string());
-    let expected = test_serialstate();
+    let expected = fake_serialstate();
     assert_eq!(state, expected);
 }
 
@@ -232,6 +280,7 @@ fn main() -> std::io::Result<()> {
 
 
     test_state_constructor();
-    test_state_lookup();
+    test_state_lookup_build();
+    test_build_state_lookup();
     Ok(())
 }
