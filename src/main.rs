@@ -136,7 +136,7 @@ struct SerialState<'a> {
     contents: Option<String>, // TODO SerialStateContents struct
 }
 
-fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
+fn state_constructor<'a>(state_spec: json::JsonValue) -> SerialState<'a> {
     // states have the following structure:
     // {
     //  "template" : {} // optional, not required
@@ -145,12 +145,11 @@ fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
     //  "format" : "header", "payload", or "header-then-payload"
     //  "contents" : specific to what "format" is
     // }
-    assert_eq!(name, state_spec["name"]);
     // we're gonna ignore template states for now...
     //
     SerialState {
         next: None,
-        name: name.to_string(),
+        name: state_spec["name"].to_string(),
         kind: state_spec["type"].to_string(),
         template: "unsupported".to_string(),
         format: state_spec["format"].to_string(),
@@ -160,7 +159,7 @@ fn state_constructor(name: &str, state_spec: json::JsonValue) -> SerialState {
 
 fn test_state_constructor() {
     let jsono = fake_jsonobj();
-    let actual = state_constructor("foo", jsono);
+    let actual = state_constructor(jsono);
     let expected = fake_serialstate();
     assert_eq!(actual, expected);
 
@@ -194,7 +193,7 @@ fn state_lookup_build<'a>(state_spec: json::JsonValue, mut lookup: HashMap<Strin
     -> (HashMap<String, SerialState<'a>>, SerialState<'a>) {
 
     let name = match &state_spec["name"] {
-        json::JsonValue::String(string) => *string,
+        json::JsonValue::String(string) => String::from(string),
         json::JsonValue::Short(short) => short.to_string(),
         _ => {
             panic!("unexpected type at 'name' key -> {:?}", state_spec);
@@ -205,7 +204,9 @@ fn state_lookup_build<'a>(state_spec: json::JsonValue, mut lookup: HashMap<Strin
     if lookup.contains_key(&name) {
         panic!("duplicate states not allowed in the specification, state with name '{}' is already defined somewhere else!", name);
     }
-    lookup.entry(name).or_insert(state_constructor(&name.clone(), state_spec));
+
+    lookup.insert(name.clone(), state_constructor(state_spec));
+    //lookup.entry(name).or_insert(state_constructor(&name.clone(), state_spec));
     // we have to do this because rust is stupid about rvalues (ok i know it's not but still)
     let state = lookup[&name].clone();
     (lookup, state)
