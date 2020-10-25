@@ -254,6 +254,45 @@ fn build_state_lookup(states_spec: json::Array) -> HashMap<String, SerialState> 
     lookup
 }
 
+fn run_fsm(machine: Vec<SerialState>) {
+    if machine.len() == 0 {
+        println!("no states to run");
+        return;
+    }
+    let mut current = &machine[0];
+    
+    loop {
+        //process_state(&current);
+        println!("current state: {:?}", current);
+        if let Some(next_id) = current.next {
+            current = &machine[next_id];
+            println!("moving to next state: {:?}", current);
+            continue
+        } else {
+            println!("terminal state reached, breaking out...");
+            break;
+        }
+    }
+}
+
+fn test_run_fsm() -> std::io::Result<()> {
+    let mut config_schema = File::open("schema.json")?;
+    let mut contents = String::new();
+    config_schema.read_to_string(&mut contents)?;
+    let schema = json::parse(&contents).expect("unable to parse json");
+
+    match &schema["states"] {
+        json::JsonValue::Array(states) => {
+            let (graph, _) = link_states(states.to_vec());
+            run_fsm(graph);
+        },
+        _ => {
+            panic!("unexpected type at states key");
+        }
+    };
+    Ok(())
+}
+
 fn test_build_state_lookup() -> std::io::Result<()> {
     let mut config_schema = File::open("schema.json")?;
     let mut contents = String::new();
@@ -271,6 +310,8 @@ fn test_build_state_lookup() -> std::io::Result<()> {
     println!("states: {:?}", lookup);
     Ok(())
 }
+
+
 
 fn test_link_states() -> std::io::Result<()> {
     let mut config_schema = File::open("schema.json")?;
@@ -368,5 +409,6 @@ fn main() -> std::io::Result<()> {
     test_state_lookup_build();
     test_build_state_lookup();
     test_link_states();
+    test_run_fsm();
     Ok(())
 }
