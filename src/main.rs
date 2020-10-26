@@ -260,7 +260,7 @@ fn build_state_lookup(states_spec: json::Array) -> HashMap<String, SerialState> 
     lookup
 }
 
-fn run_fsm(machine: Vec<SerialState>) {
+fn run_fsm(machine: &Vec<SerialState>) {
     if machine.len() == 0 {
         println!("no states to run");
         return;
@@ -289,13 +289,31 @@ fn test_run_fsm() -> std::io::Result<()> {
     match &schema["states"] {
         json::JsonValue::Array(states) => {
             let (graph, _) = link_states(states.to_vec());
-            run_fsm(graph);
+            //run_fsm(&graph);
+            to_dot(&graph);
         },
         _ => {
             panic!("unexpected type at states key");
         }
     };
     Ok(())
+}
+
+fn alphabet(integer: usize) -> char {
+    char::from(integer as u8 + b'a')
+}
+
+fn to_dot(graph: &Vec<SerialState>) {
+    println!("digraph serial_state_machine {{");
+    for (i, state) in graph.iter().enumerate() {
+        let next = match state.next {
+            Some(index) => alphabet(index).to_string(),
+            None => "stop".to_string()
+        };
+        println!("\t{}[label=\"{}\"];", alphabet(i), state.name);
+        println!("\t{} -> {};", alphabet(i), next); 
+    }
+    println!("}}");
 }
 
 fn test_build_state_lookup() -> std::io::Result<()> {
@@ -370,6 +388,10 @@ fn link_states(states_spec: json::Array) -> (Vec<SerialState>, HashMap<String, u
                 continue; // we've reached a stop state, nothing to do here
             }
         }
+        if ! id_lookup.contains_key(&next_name) {
+            panic!("There is no state named '{}' in the state machine, perhaps you made a typo?", next_name);
+            // TODO: see which state name is closest and suggest it
+        }
         let next_id = id_lookup[&next_name];
         
         let error_msg = format!("A state named {} with ID {} should exist, but doesn't", name, id);
@@ -406,14 +428,14 @@ fn main() -> std::io::Result<()> {
     for key in &["parity", "flow-control", "baud", "data-bits", "stop-bits"] {
         settings = set_option(&schema, key, settings);
     }
-    println!("{:?}", settings);
+    //println!("{:?}", settings);
     //let mut port : SerialOptions;
 
 
-    test_state_constructor();
-    test_state_lookup_build();
-    test_build_state_lookup();
-    test_link_states();
+    //test_state_constructor();
+    //test_state_lookup_build();
+    //test_build_state_lookup();
+    //test_link_states();
     test_run_fsm();
     Ok(())
 }

@@ -7,7 +7,7 @@
       "baud": "# standard bauds prefixed with 'B', nonstandard bauds supported in the future",
       "flow-control": "could be 'rts/cts', 'none'"
     },
-    "baud": "B90",
+    "baud": "B4800",
     "data-bits": 8,
     "stop-bits": 1,
     "data-parity-stop": "8N1",
@@ -82,7 +82,21 @@
     },
     {
       "name": "recv_response",
-      "next": null,
+      "next": "log_values",
+      "type": "receive",
+      "format": "header-then-payload",
+      "contents": null
+    },
+    {
+      "name" : "hello",
+      "next" : "send_command",
+      "type": "receive",
+      "format": "header-then-payload",
+      "contents": null
+    },
+    {
+      "name" : "log_values",
+      "next" : "send_command",
       "type": "receive",
       "format": "header-then-payload",
       "contents": null
